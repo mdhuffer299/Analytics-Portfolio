@@ -1,0 +1,80 @@
+{
+	"dag_name": "TEST_BATCH_READ_DAG"
+	, "schedule": "None"
+	, "tasks": {
+		"start": {
+			"task_id": "start"
+			, "operator": "DummyOperator"
+			, "upstream_dependencies": 0
+		}
+		,"read_dag_config_file": {
+			"task_id": "read_dag_config"
+			, "operator": "PythonOperator"
+			, "python_callable": "read_config_file"
+			, "provide_context": "True"
+			, "op_kwargs": {"file_path": "directory"}
+			, "upstream_dependencies": "start"
+		}
+		, "get_google_form_requirements": {
+			"task_id": "get_google_form_requirements"
+			, "operator": "PythonOperator"
+			, "python_callable": "return_google_sheet_df"
+			, "provide_context": "True"
+			, "op_kwargs": {"dag_task_id": "read_dag_config", "last_run_time": "6/9/2020 12:00:00"}
+			, "upstream_dependencies": "read_dag_config_file"
+		}
+		, "clean_google_params": {
+			"task_id": "clean_google_params"
+			, "operator": "PythonOperator"
+			, "python_callable": "clean_google_params_batch"
+			, "provide_context": "True"
+			, "op_kwargs" : {"dag_task_id": ["get_google_form_requirements", "read_dag_config"]}
+			, "upstream_dependencies": "get_google_form_requirements"
+		}
+		, "create_acct_sql_statements": {
+			"task_id": "acct_sql_statements"
+			, "operator": "PythonOperator"
+			, "python_callable": "create_sql_statements_batch"
+			, "provide_context": "True"
+			, "op_kwargs": {"dag_task_id": "clean_google_params"
+							, "input_list_check": ["COLUMN"]
+							, "product_sql_statements": 0
+							, "target_ae_sql_statements": 0
+						}
+			, "upstream_dependencies": "clean_google_params"
+		}
+		, "create_prod_1_sql_statements": {
+			"task_id": "prod_1_sql_statements"
+			, "operator": "PythonOperator"
+			, "python_callable": "create_sql_statements_batch"
+			, "provide_context": "True"
+			, "op_kwargs": {"dag_task_id": "clean_google_params"
+							, "input_list_check": ["COLUMN"]
+							, "product_sql_statements": 1
+							, "target_ae_sql_statements": 0
+						}
+			, "upstream_dependencies": "clean_google_params"
+		}
+		, "create_sql_filter_config": {
+			"task_id": "create_sql_filter_config"
+			, "operator": "PythonOperator"
+			, "python_callable": "create_sql_filter_config_batch"
+			, "provide_context": "True"
+			, "op_kwargs": {"dag_task_id": ["acct_sql_statements", "prod_1_sql_statements"]}
+			, "upstream_dependencies": ["create_acct_sql_statements", "create_prod_1_sql_statements"]
+		}
+		, "write_config_to_local": {
+			"task_id": "write_config_to_local"
+			, "operator": "PythonOperator"
+			, "python_callable": "write_local_config_file"
+			, "provide_context": "True"
+			, "op_kwargs": {"dag_task_id": ["create_sql_filter_config", "read_dag_config"], "output_file_name": "filter_params_output"}
+			, "upstream_dependencies": "create_sql_filter_config"
+		}
+		, "end": {
+			"task_id": "end"
+			, "operator": "DummyOperator"
+			, "upstream_dependencies": "write_config_to_local"
+		}
+	}
+}

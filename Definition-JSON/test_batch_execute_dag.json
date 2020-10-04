@@ -1,0 +1,62 @@
+{
+	"dag_name": "TEST_BATCH_EXECUTE_DAG"
+	, "schedule": "None"
+	, "tasks": {
+		"start": {
+			"task_id": "start"
+			, "operator": "DummyOperator"
+			, "upstream_dependencies": 0
+		}
+		, "read_dag_config_file": {
+			"task_id": "read_dag_config"
+			, "operator": "PythonOperator"
+			, "python_callable": "read_config_file"
+			, "provide_context": "True"
+			, "op_kwargs": {"file_path": "directory"}
+			, "upstream_dependencies": "start"
+		}
+		, "read_filter_config_file": {
+			"task_id": "read_filter_config"
+			, "operator": "PythonOperator"
+			, "python_callable": "read_config_file"
+			, "provide_context": "True"
+			, "op_kwargs": {"file_path": "directory"}
+			, "upstream_dependencies": "start"
+		}
+		, "dummy_operator": {
+			"task_id": "dummy_operator"
+			, "operator": "DummyOperator"
+			, "upstream_dependencies": ["read_dag_config_file", "read_filter_config_file"]
+		}
+		, "execute_truncate_sql": {
+			"task_id": "execute_truncate_sql"
+			, "operator": "PythonOperator"
+			, "python_callable": "execute_sql_batch"
+			, "provide_context": "True"
+			, "op_kwargs": {"dag_task_id": ["read_dag_config"]
+							, "sql_file_info_key": "truncate_table"
+							, "db_connection": ""
+							, "return_pandas_df": 0
+							}
+			, "upstream_dependencies": "dummy_operator"
+		}
+		, "execute_prod_1_sql": {
+			"task_id": "execute_prod_1_sql"
+			, "operator": "PythonOperator"
+			, "python_callable": "execute_sql_batch"
+			, "provide_context": "True"
+			, "op_kwargs": {"dag_task_id": ["read_dag_config", "read_filter_config"]
+							, "filter_list": ["acct_sql_statements", "prod_1_sql_statements", "request_number"]
+							, "sql_file_info_key": "prod_1_batch_table"
+							, "db_connection": ""
+							, "return_pandas_df": 0
+							}
+			, "upstream_dependencies": "execute_truncate_sql"
+		}
+		, "end": {
+			"task_id": "end"
+			, "operator": "DummyOperator"
+			, "upstream_dependencies": "execute_prod_1_sql"
+		}
+	}
+}
